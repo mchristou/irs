@@ -1,12 +1,32 @@
+use argh::FromArgs;
 use std::net::{IpAddr, SocketAddr};
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::time::Duration;
 
+#[derive(FromArgs)]
+/// IP range scanner
+struct Args {
+    #[argh(positional)]
+    /// start and end IP addresses in the format "start_ip-end_ip"
+    ip_range: String,
+    #[argh(positional)]
+    /// ports to check
+    port: Vec<u16>,
+}
+
 #[tokio::main]
 async fn main() {
+    let args: Args = argh::from_env();
+
+    let (start_ip, end_ip) = parse_ip_range(&args.ip_range).unwrap_or_else(|e| {
+        eprintln!("Error parsing IP range: {}", e);
+        std::process::exit(1);
+    });
+
     let start_ip: u8 = 1;
     let end_ip: u8 = 255;
     let base_ip = "200.200.1.";
@@ -37,10 +57,12 @@ async fn main() {
                                         .unwrap();
                                 }
                                 Err(e) => {
-                                    sender
+                                    /*  sender
                                         .send(format!("{}:{} connection error: {}", ip, port, e))
                                         .await
                                         .unwrap();
+
+                                    */
                                 }
                             }
                         });
@@ -61,6 +83,16 @@ async fn main() {
     while let Some(message) = receiver.recv().await {
         println!("{}", message);
     }
+}
+
+fn parse_ip_range(range: &str) -> Result<(IpAddr, IpAddr), &'static str> {
+    let parts: Vec<&str> = range.split('-').collect();
+    if parts.len() != 2 {
+        return Err("Invalid IP range format. Should be 'start_ip-end_ip'");
+    }
+    let start_ip = IpAddr::from_str(parts[0]).map_err(|_| "Invalid start IP address")?;
+    let end_ip = IpAddr::from_str(parts[1]).map_err(|_| "Invalid end IP address")?;
+    Ok((start_ip, end_ip))
 }
 
 async fn is_host_reachable(socket_addr: SocketAddr) -> Result<(), String> {
