@@ -36,9 +36,7 @@ async fn main() {
     let (sender, mut receiver) = mpsc::channel(255);
     let sender = Arc::new(sender);
 
-    scan_ip_range(args.base_ip, start_ip, end_ip, args.port, sender.clone()).await;
-
-    drop(sender); // Drop sender to signal that no more messages will be sent
+    scan_ip_range(args.base_ip, start_ip, end_ip, args.port, sender).await;
 
     while let Some(message) = receiver.recv().await {
         println!("{}", message);
